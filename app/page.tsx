@@ -75,8 +75,13 @@ export default function Home() {
       return;
     }
 
-    const objectUrl = URL.createObjectURL(file);
-    updateSelected({ imageUrl: objectUrl });
+    const reader = new FileReader();
+    reader.onload = () => {
+      const dataUrl = String(reader.result); // e.g. data:image/png;base64,....
+      updateSelected({ imageUrl: dataUrl });
+    };
+    reader.onerror = () => alert("Failed to read the image file.");
+    reader.readAsDataURL(file);
   }
 
   // ====== Export PNG (title + grid only) ======
