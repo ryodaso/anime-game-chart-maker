@@ -23,7 +23,7 @@ export default function Home() {
   const cols = 6;
 
   // ====== Core state ======
-  const [chartTitle, setChartTitle] = useState("About You: Video Games");
+  const [chartTitle, setChartTitle] = useState("About You: Video Games/Anime");
 
   const defaultLabels = useMemo(
     () => [
