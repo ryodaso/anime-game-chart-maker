@@ -23,7 +23,7 @@ export default function Home() {
   const cols = 6;
 
   // ====== Core state ======
-  const [chartTitle, setChartTitle] = useState("About You: Video Games/Anime");
+  const [chartTitle, setChartTitle] = useState("About You: Video Games");
 
   const defaultLabels = useMemo(
     () => [
@@ -65,6 +65,21 @@ export default function Home() {
     });
   }
 
+  // ====== Upload your own image ======
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  function handleUploadImage(file: File) {
+    if (selectedIndex === null) return;
+
+    if (!file.type.startsWith("image/")) {
+      alert("Please upload an image file (png/jpg/webp/etc).");
+      return;
+    }
+
+    const objectUrl = URL.createObjectURL(file);
+    updateSelected({ imageUrl: objectUrl });
+  }
+
   // ====== Export PNG (title + grid only) ======
   const exportRef = useRef<HTMLDivElement | null>(null);
   const [isExporting, setIsExporting] = useState(false);
@@ -87,7 +102,7 @@ export default function Home() {
     } catch (err) {
       console.error(err);
       alert(
-        "Export failed. If this happens after adding images, it may be a CORS issue. (We can fix by proxying images through your backend.)"
+        "Export failed. If this happens after adding external images, it may be a CORS issue. (Uploads should export reliably.)"
       );
     } finally {
       setIsExporting(false);
@@ -159,7 +174,7 @@ export default function Home() {
   }, [isSearchOpen]);
 
   // ====== Layout choices ======
-  const CELL_ASPECT = "2 / 3"; // you said you switched to aspectRatio already
+  const CELL_ASPECT = "2 / 3";
   const gridMaxWidth = 1100;
 
   // ====== Shared style helpers (font colors everywhere) ======
@@ -325,6 +340,20 @@ export default function Home() {
           >
             <div style={{ fontWeight: 900, marginBottom: 12, color: black }}>Editor</div>
 
+            {/* Hidden file input for Upload */}
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              style={{ display: "none" }}
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) handleUploadImage(file);
+                // reset so the same file can be selected again
+                e.currentTarget.value = "";
+              }}
+            />
+
             {selectedCell ? (
               <>
                 <div style={{ marginBottom: 12 }}>
@@ -362,6 +391,7 @@ export default function Home() {
                   />
                 </div>
 
+                {/* Image controls: Search / Upload / Clear */}
                 <div style={{ display: "flex", gap: 10, marginBottom: 12 }}>
                   <button
                     onClick={() => setIsSearchOpen(true)}
@@ -371,14 +401,25 @@ export default function Home() {
                       height: 40,
                     }}
                   >
-                    Choose Image
+                    Search
+                  </button>
+
+                  <button
+                    onClick={() => fileInputRef.current?.click()}
+                    style={{
+                      ...buttonStyle,
+                      flex: 1,
+                      height: 40,
+                    }}
+                  >
+                    Upload
                   </button>
 
                   <button
                     onClick={clearImage}
                     style={{
                       ...buttonStyle,
-                      width: 110,
+                      width: 90,
                       height: 40,
                     }}
                   >
@@ -387,7 +428,7 @@ export default function Home() {
                 </div>
 
                 <div style={{ fontSize: 12, color: gray }}>
-                  Tip: the exported PNG includes the title + grid only.
+                  Tip: Upload is great for custom covers/personal images and exports reliably.
                 </div>
               </>
             ) : (
@@ -417,18 +458,18 @@ export default function Home() {
               style={{
                 width: 900,
                 maxWidth: "100%",
-                maxHeight: "90vh", // ✅ prevent modal from exceeding viewport
+                maxHeight: "90vh",
                 background: "white",
                 borderRadius: 12,
                 border: "1px solid #ddd",
-                padding: 0, // padding handled by header + body
+                padding: 0,
                 display: "flex",
                 flexDirection: "column",
-                overflow: "hidden", // ✅ keep scrolling inside
+                overflow: "hidden",
                 color: black,
               }}
             >
-              {/* Sticky header: close + search controls always reachable */}
+              {/* Sticky header */}
               <div
                 style={{
                   position: "sticky",
@@ -467,7 +508,7 @@ export default function Home() {
                       border: `1px solid ${borderGray}`,
                       padding: "0 10px",
                       fontWeight: 800,
-                      color: black, // ✅ fixed text color
+                      color: black,
                       background: "white",
                       outline: "none",
                       cursor: "pointer",
@@ -491,7 +532,7 @@ export default function Home() {
                       borderRadius: 8,
                       border: `1px solid ${borderGray}`,
                       padding: "0 10px",
-                      color: black, // ✅ fixed typed text color
+                      color: black,
                       background: "white",
                       outline: "none",
                     }}
@@ -561,7 +602,14 @@ export default function Home() {
                         }}
                       />
                       <div style={{ padding: 10 }}>
-                        <div style={{ fontWeight: 900, fontSize: 12, lineHeight: 1.2, color: black }}>
+                        <div
+                          style={{
+                            fontWeight: 900,
+                            fontSize: 12,
+                            lineHeight: 1.2,
+                            color: black,
+                          }}
+                        >
                           {r.title}
                         </div>
                         {r.year ? (
