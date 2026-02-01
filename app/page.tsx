@@ -1,65 +1,587 @@
-import Image from "next/image";
+"use client";
+
+import { useEffect, useMemo, useRef, useState } from "react";
+import { toPng } from "html-to-image";
+
+type CellData = {
+  label: string;
+  bg: string;
+  imageUrl?: string;
+};
+
+type SearchType = "game" | "anime";
+
+type SearchResult = {
+  id: string;
+  title: string;
+  year?: number;
+  imageUrl: string;
+};
 
 export default function Home() {
+  const rows = 3;
+  const cols = 6;
+
+  // ====== Core state ======
+  const [chartTitle, setChartTitle] = useState("About You: Video Games/Anime");
+
+  const defaultLabels = useMemo(
+    () => [
+      "Favorite Game of all Time",
+      "Favorite Series",
+      "Best Soundtrack",
+      "Favorite Protagonist",
+      "Favorite Villain",
+      "Best Story",
+      "Have not played but want to",
+      "You Love Everyone Hates",
+      "You Hate Everyone Loves",
+      "Best Art Style",
+      "Favorite Ending",
+      "Favorite Boss Fight",
+      "Childhood Game",
+      "Relaxing Game",
+      "Stressful Game",
+      "Game you always come back to",
+      "Guilty Pleasure",
+      "Tons of Hours Played",
+    ],
+    []
+  );
+
+  const [cells, setCells] = useState<CellData[]>(
+    defaultLabels.map((label) => ({ label, bg: "#ffffff" }))
+  );
+
+  const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
+  const selectedCell = selectedIndex !== null ? cells[selectedIndex] : null;
+
+  function updateSelected(patch: Partial<CellData>) {
+    if (selectedIndex === null) return;
+    setCells((prev) => {
+      const copy = [...prev];
+      copy[selectedIndex] = { ...copy[selectedIndex], ...patch };
+      return copy;
+    });
+  }
+
+  // ====== Export PNG (title + grid only) ======
+  const exportRef = useRef<HTMLDivElement | null>(null);
+  const [isExporting, setIsExporting] = useState(false);
+
+  async function exportPng() {
+    if (!exportRef.current) return;
+
+    try {
+      setIsExporting(true);
+
+      const dataUrl = await toPng(exportRef.current, {
+        cacheBust: true,
+        pixelRatio: 2,
+      });
+
+      const link = document.createElement("a");
+      link.download = `${(chartTitle || "chart").replace(/[\\/:*?"<>|]/g, "")}.png`;
+      link.href = dataUrl;
+      link.click();
+    } catch (err) {
+      console.error(err);
+      alert(
+        "Export failed. If this happens after adding images, it may be a CORS issue. (We can fix by proxying images through your backend.)"
+      );
+    } finally {
+      setIsExporting(false);
+    }
+  }
+
+  // ====== Search modal state ======
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [searchType, setSearchType] = useState<SearchType>("game");
+  const [query, setQuery] = useState("");
+  const [results, setResults] = useState<SearchResult[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const [searchError, setSearchError] = useState<string | null>(null);
+
+  async function runSearch() {
+    const q = query.trim();
+    if (!q) return;
+
+    setIsSearching(true);
+    setSearchError(null);
+    setResults([]);
+
+    try {
+      const res = await fetch(`/api/search/${searchType}?q=${encodeURIComponent(q)}`);
+      if (!res.ok) {
+        const msg = await res.text();
+        throw new Error(msg || "Search failed");
+      }
+      const data = (await res.json()) as { results: SearchResult[] };
+      setResults(data.results || []);
+    } catch (e: any) {
+      setSearchError(e?.message ?? "Search failed");
+    } finally {
+      setIsSearching(false);
+    }
+  }
+
+  function pickResult(r: SearchResult) {
+    if (selectedIndex === null) return;
+    updateSelected({ imageUrl: r.imageUrl });
+    setIsSearchOpen(false);
+  }
+
+  function clearImage() {
+    updateSelected({ imageUrl: undefined });
+  }
+
+  // ====== Modal UX improvements ======
+  // 1) Close on Escape
+  useEffect(() => {
+    if (!isSearchOpen) return;
+
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setIsSearchOpen(false);
+    };
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [isSearchOpen]);
+
+  // 2) Prevent background scrolling while modal open
+  useEffect(() => {
+    if (!isSearchOpen) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [isSearchOpen]);
+
+  // ====== Layout choices ======
+  const CELL_ASPECT = "2 / 3"; // you said you switched to aspectRatio already
+  const gridMaxWidth = 1100;
+
+  // ====== Shared style helpers (font colors everywhere) ======
+  const baseFont = "Arial, sans-serif";
+  const black = "#000";
+  const gray = "#666";
+  const borderGray = "#ccc";
+
+  const inputStyle: React.CSSProperties = {
+    color: black,
+    background: "white",
+    border: `1px solid ${borderGray}`,
+    borderRadius: 6,
+    padding: 8,
+    outline: "none",
+  };
+
+  const buttonStyle: React.CSSProperties = {
+    color: black,
+    background: "white",
+    border: `1px solid ${borderGray}`,
+    borderRadius: 8,
+    cursor: "pointer",
+    fontWeight: 800,
+  };
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+    <div style={{ padding: 24, fontFamily: baseFont, color: black }}>
+      <div style={{ maxWidth: 1500, margin: "0 auto" }}>
+        {/* Controls row (NOT exported) */}
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: 12,
+            flexWrap: "wrap",
+            marginBottom: 12,
+          }}
+        >
+          <div style={{ fontWeight: 900, color: black }}>Controls</div>
+
+          <button
+            onClick={exportPng}
+            disabled={isExporting}
+            style={{
+              ...buttonStyle,
+              height: 40,
+              padding: "0 14px",
+              background: isExporting ? "#eee" : "white",
+              cursor: isExporting ? "not-allowed" : "pointer",
+            }}
           >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+            {isExporting ? "Exporting..." : "Export PNG"}
+          </button>
         </div>
-      </main>
+
+        <div style={{ display: "flex", gap: 20, alignItems: "flex-start", flexWrap: "wrap" }}>
+          {/* EXPORT AREA: Title + Grid */}
+          <div style={{ maxWidth: gridMaxWidth, width: "100%", flex: 1, minWidth: 0 }}>
+            <div
+              ref={exportRef}
+              style={{
+                background: "white",
+                padding: 16,
+                borderRadius: 12,
+              }}
+            >
+              {/* Title (exported) */}
+              <div style={{ textAlign: "center", marginBottom: 16 }}>
+                <input
+                  value={chartTitle}
+                  onChange={(e) => setChartTitle(e.target.value)}
+                  style={{
+                    fontSize: 32,
+                    fontWeight: 900,
+                    textAlign: "center",
+                    border: "none",
+                    outline: "none",
+                    width: "100%",
+                    background: "transparent",
+                    color: black,
+                  }}
+                />
+                
+              </div>
+
+              {/* Grid (exported) */}
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: `repeat(${cols}, 1fr)`,
+                  gap: 12,
+                }}
+              >
+                {Array.from({ length: rows * cols }).map((_, i) => {
+                  const cell = cells[i] ?? { label: `Cell ${i + 1}`, bg: "#ffffff" };
+                  const isSelected = i === selectedIndex;
+
+                  return (
+                    <button
+                      key={i}
+                      onClick={() => setSelectedIndex(i)}
+                      style={{
+                        border: isSelected ? "4px solid #0070f3" : "2px solid black",
+                        aspectRatio: CELL_ASPECT,
+                        position: "relative",
+                        background: cell.bg,
+                        cursor: "pointer",
+                        padding: 0,
+                        textAlign: "left",
+                        width: "100%",
+                        overflow: "hidden",
+                      }}
+                    >
+                      {/* Cover image */}
+                      {cell.imageUrl ? (
+                        <div
+                          style={{
+                            position: "absolute",
+                            inset: 0,
+                            backgroundImage: `url(${cell.imageUrl})`,
+                            backgroundSize: "cover",
+                            backgroundPosition: "center",
+                          }}
+                        />
+                      ) : null}
+
+                      {/* Label strip */}
+                      <div
+                        style={{
+                          position: "absolute",
+                          bottom: 0,
+                          left: 0,
+                          right: 0,
+                          padding: "8px 8px",
+                          fontSize: 14,
+                          fontWeight: 900,
+                          color: black,
+                          background: "rgba(255,255,255,0.88)",
+                          lineHeight: 1.2,
+                        }}
+                      >
+                        {cell.label}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+
+          {/* Editor Panel (NOT exported) */}
+          <div
+            style={{
+              width: 320,
+              border: "1px solid #ddd",
+              borderRadius: 8,
+              padding: 16,
+              color: black,
+              background: "white",
+            }}
+          >
+            <div style={{ fontWeight: 900, marginBottom: 12, color: black }}>Editor</div>
+
+            {selectedCell ? (
+              <>
+                <div style={{ marginBottom: 12 }}>
+                  <div style={{ fontSize: 12, fontWeight: 900, marginBottom: 6, color: black }}>
+                    Label
+                  </div>
+                  <input
+                    value={selectedCell.label}
+                    onChange={(e) => updateSelected({ label: e.target.value })}
+                    style={{
+                      ...inputStyle,
+                      width: "100%",
+                      height: 38,
+                      padding: "0 10px",
+                    }}
+                  />
+                </div>
+
+                <div style={{ marginBottom: 12 }}>
+                  <div style={{ fontSize: 12, fontWeight: 900, marginBottom: 6, color: black }}>
+                    Background color
+                  </div>
+                  <input
+                    type="color"
+                    value={selectedCell.bg}
+                    onChange={(e) => updateSelected({ bg: e.target.value })}
+                    style={{
+                      width: 60,
+                      height: 40,
+                      border: `1px solid ${borderGray}`,
+                      borderRadius: 8,
+                      background: "white",
+                      cursor: "pointer",
+                    }}
+                  />
+                </div>
+
+                <div style={{ display: "flex", gap: 10, marginBottom: 12 }}>
+                  <button
+                    onClick={() => setIsSearchOpen(true)}
+                    style={{
+                      ...buttonStyle,
+                      flex: 1,
+                      height: 40,
+                    }}
+                  >
+                    Choose Image
+                  </button>
+
+                  <button
+                    onClick={clearImage}
+                    style={{
+                      ...buttonStyle,
+                      width: 110,
+                      height: 40,
+                    }}
+                  >
+                    Clear
+                  </button>
+                </div>
+
+                <div style={{ fontSize: 12, color: gray }}>
+                  Tip: the exported PNG includes the title + grid only.
+                </div>
+              </>
+            ) : (
+              <div style={{ color: gray }}>Click a cell to edit it.</div>
+            )}
+          </div>
+        </div>
+
+        {/* Search Modal */}
+        {isSearchOpen ? (
+          <div
+            onClick={() => setIsSearchOpen(false)}
+            style={{
+              position: "fixed",
+              inset: 0,
+              background: "rgba(0,0,0,0.35)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              padding: 20,
+              zIndex: 9999,
+            }}
+          >
+            {/* Modal panel */}
+            <div
+              onClick={(e) => e.stopPropagation()}
+              style={{
+                width: 900,
+                maxWidth: "100%",
+                maxHeight: "90vh", // ✅ prevent modal from exceeding viewport
+                background: "white",
+                borderRadius: 12,
+                border: "1px solid #ddd",
+                padding: 0, // padding handled by header + body
+                display: "flex",
+                flexDirection: "column",
+                overflow: "hidden", // ✅ keep scrolling inside
+                color: black,
+              }}
+            >
+              {/* Sticky header: close + search controls always reachable */}
+              <div
+                style={{
+                  position: "sticky",
+                  top: 0,
+                  background: "white",
+                  padding: 16,
+                  borderBottom: "1px solid #eee",
+                  zIndex: 1,
+                }}
+              >
+                <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
+                  <div style={{ fontWeight: 900, fontSize: 18, color: black }}>
+                    Search covers
+                  </div>
+                  <button
+                    onClick={() => setIsSearchOpen(false)}
+                    style={{
+                      ...buttonStyle,
+                      padding: "6px 10px",
+                      height: 34,
+                      fontWeight: 900,
+                    }}
+                    title="Close (Esc)"
+                  >
+                    Close
+                  </button>
+                </div>
+
+                <div style={{ display: "flex", gap: 10, marginTop: 12, flexWrap: "wrap" }}>
+                  <select
+                    value={searchType}
+                    onChange={(e) => setSearchType(e.target.value as SearchType)}
+                    style={{
+                      height: 40,
+                      borderRadius: 8,
+                      border: `1px solid ${borderGray}`,
+                      padding: "0 10px",
+                      fontWeight: 800,
+                      color: black, // ✅ fixed text color
+                      background: "white",
+                      outline: "none",
+                      cursor: "pointer",
+                    }}
+                  >
+                    <option value="game">Games</option>
+                    <option value="anime">Anime</option>
+                  </select>
+
+                  <input
+                    value={query}
+                    onChange={(e) => setQuery(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") runSearch();
+                    }}
+                    placeholder={`Search ${searchType}...`}
+                    style={{
+                      flex: 1,
+                      minWidth: 200,
+                      height: 40,
+                      borderRadius: 8,
+                      border: `1px solid ${borderGray}`,
+                      padding: "0 10px",
+                      color: black, // ✅ fixed typed text color
+                      background: "white",
+                      outline: "none",
+                    }}
+                  />
+
+                  <button
+                    onClick={runSearch}
+                    disabled={isSearching}
+                    style={{
+                      ...buttonStyle,
+                      height: 40,
+                      padding: "0 14px",
+                      background: isSearching ? "#eee" : "white",
+                      cursor: isSearching ? "not-allowed" : "pointer",
+                      fontWeight: 900,
+                    }}
+                  >
+                    {isSearching ? "Searching..." : "Search"}
+                  </button>
+                </div>
+
+                {searchError ? (
+                  <div style={{ marginTop: 10, color: "crimson", fontSize: 12 }}>
+                    {searchError}
+                  </div>
+                ) : null}
+              </div>
+
+              {/* Scrollable results area */}
+              <div
+                style={{
+                  padding: 16,
+                  overflowY: "auto",
+                  flex: 1,
+                }}
+              >
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))",
+                    gap: 12,
+                  }}
+                >
+                  {results.map((r) => (
+                    <button
+                      key={`${searchType}-${r.id}`}
+                      onClick={() => pickResult(r)}
+                      style={{
+                        border: "1px solid #ddd",
+                        borderRadius: 10,
+                        overflow: "hidden",
+                        background: "white",
+                        cursor: "pointer",
+                        textAlign: "left",
+                        padding: 0,
+                        color: black,
+                      }}
+                      title={r.title}
+                    >
+                      <div
+                        style={{
+                          width: "100%",
+                          aspectRatio: "2 / 3",
+                          backgroundImage: `url(${r.imageUrl})`,
+                          backgroundSize: "cover",
+                          backgroundPosition: "center",
+                        }}
+                      />
+                      <div style={{ padding: 10 }}>
+                        <div style={{ fontWeight: 900, fontSize: 12, lineHeight: 1.2, color: black }}>
+                          {r.title}
+                        </div>
+                        {r.year ? (
+                          <div style={{ fontSize: 11, color: gray, marginTop: 4 }}>{r.year}</div>
+                        ) : null}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+
+                {results.length === 0 && !isSearching ? (
+                  <div style={{ marginTop: 12, color: gray, fontSize: 12 }}>
+                    Search for a title, then click a result to set the cell image.
+                  </div>
+                ) : null}
+              </div>
+            </div>
+          </div>
+        ) : null}
+      </div>
     </div>
   );
 }
