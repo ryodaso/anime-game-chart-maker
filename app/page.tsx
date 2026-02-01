@@ -204,6 +204,13 @@ export default function Home() {
   return (
     <div style={{ padding: 24, fontFamily: baseFont, color: black }}>
       <div style={{ maxWidth: 1500, margin: "0 auto" }}>
+
+        {/* SEO-only H1 (hidden visually, readable by search engines) */}
+        <h1 style={{ position: "absolute", left: "-9999px" }}>
+          Anime & Video Game Chart Maker
+        </h1>
+
+
         {/* Controls row (NOT exported) */}
         <div
           style={{
