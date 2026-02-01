@@ -5,7 +5,6 @@ import { toPng } from "html-to-image";
 
 type CellData = {
   label: string;
-  bg: string;
   imageUrl?: string;
 };
 
@@ -50,7 +49,7 @@ export default function Home() {
   );
 
   const [cells, setCells] = useState<CellData[]>(
-    defaultLabels.map((label) => ({ label, bg: "#ffffff" }))
+    defaultLabels.map((label) => ({ label}))
   );
 
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
@@ -289,7 +288,6 @@ export default function Home() {
                         border: isSelected ? "4px solid #0070f3" : "2px solid black",
                         aspectRatio: CELL_ASPECT,
                         position: "relative",
-                        background: cell.bg,
                         cursor: "pointer",
                         padding: 0,
                         textAlign: "left",
@@ -375,25 +373,6 @@ export default function Home() {
                       width: "100%",
                       height: 38,
                       padding: "0 10px",
-                    }}
-                  />
-                </div>
-
-                <div style={{ marginBottom: 12 }}>
-                  <div style={{ fontSize: 12, fontWeight: 900, marginBottom: 6, color: black }}>
-                    Background color
-                  </div>
-                  <input
-                    type="color"
-                    value={selectedCell.bg}
-                    onChange={(e) => updateSelected({ bg: e.target.value })}
-                    style={{
-                      width: 60,
-                      height: 40,
-                      border: `1px solid ${borderGray}`,
-                      borderRadius: 8,
-                      background: "white",
-                      cursor: "pointer",
                     }}
                   />
                 </div>
